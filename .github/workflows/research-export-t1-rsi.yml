@@ -1,0 +1,35 @@
+name: Export T1 RSI trades
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/export_t1_rsi_trades.py"
+      - ".github/workflows/research-export-t1-rsi.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [USDJPY, XAUUSD]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6"
+      - name: Export
+        run: python research/export_t1_rsi_trades.py --symbol "${{ matrix.symbol }}"
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: t1-rsi-trades-${{ matrix.symbol }}
+          path: research/results/*_T1_RSI_base_trades.csv
+          retention-days: 14
