@@ -1,0 +1,32 @@
+name: Research London breakout
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/backtest_london_breakout.py"
+      - ".github/workflows/research-london-breakout.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  london:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6" "tzdata>=2025.2"
+      - name: Run London breakout
+        run: python research/backtest_london_breakout.py
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: london-breakout-usdjpy
+          path: research/results/
+          retention-days: 14
