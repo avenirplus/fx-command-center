@@ -262,6 +262,40 @@ def run_tf(symbol,b,tf_name,lookback,counter_bars,max_hold,outdir):
             print(f"{row['year']}: n={row['trades']:4d} win={row['win_pct']:6.2f}% PF={row['pf']:7.3f} avgR={row['avg_r']:+.4f}")
     return summ
 
+def eval_trades_rr(b, signal_mask, direction, atr, max_hold, tp_r):
+    idx=np.flatnonzero(signal_mask)
+    rows=[]
+    o=b["Open"].to_numpy(float); h=b["High"].to_numpy(float); l=b["Low"].to_numpy(float); cl=b["Close"].to_numpy(float)
+    av=atr.to_numpy(float); times=b.index
+    for i in idx:
+        if i+1>=len(b) or not np.isfinite(av[i]) or av[i]<=0:
+            continue
+        d=int(direction[i])
+        if d not in (-1,1):
+            continue
+        entry=o[i+1]; risk=av[i]
+        tp=entry+d*tp_r*risk; sl=entry-d*risk
+        last=min(i+1+max_hold,len(b)-1)
+        r=None; exit_i=last; reason="timeout"
+        for j in range(i+1,last+1):
+            if d==1:
+                if l[j]<=sl:
+                    r=-1.0; exit_i=j; reason="SL"; break
+                if h[j]>=tp:
+                    r=float(tp_r); exit_i=j; reason="TP"; break
+            else:
+                if h[j]>=sl:
+                    r=-1.0; exit_i=j; reason="SL"; break
+                if l[j]<=tp:
+                    r=float(tp_r); exit_i=j; reason="TP"; break
+        if r is None:
+            # Forced exit at the close when 48h expires.
+            r=float(d*(cl[last]-entry)/risk)
+            reason="TIME"
+        rows.append((times[i],times[i+1],d,r,reason))
+    return pd.DataFrame(rows,columns=["signal_time","entry_time","direction","R","reason"])
+
+
 def build_masks_h4_swing(b: pd.DataFrame):
     trend=h4_trend_from(b)
     av=atr_wilder(b,14)
@@ -380,6 +414,18 @@ def run_h4_swing(symbol,b,outdir):
                 print(f"H4ERA {name:24s} {era}: n={es['trades']:4d} win={es['win_pct']:6.2f}% PF={es['pf']:7.3f} avgR={es['avg_r']:+.4f}")
     out=pd.DataFrame(rows)
     out.to_csv(outdir/f"{symbol}_{tf_name}_summary.csv",index=False)
+
+    # Predefined exit-only robustness grid. Entry signals are unchanged.
+    rr_rows=[]
+    for name in ["candidate_50_61_8","price_HL_LH","MACD_hist_hidden","CCI_and_MACD_hidden"]:
+        mask=masks[name]
+        for tp_r in [0.50,0.75,1.00,1.25,1.50,2.00]:
+            tr=eval_trades_rr(b,mask,direction,av,48,tp_r)
+            s=summarize(tr)
+            forced=int((tr["reason"]=="TIME").sum()) if not tr.empty else 0
+            rr_rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,"tp_r":tp_r,"sl_r":1.0,"forced_48h":forced,**s})
+            print(f"RRGRID {name:24s} TP={tp_r:4.2f}R n={s['trades']:4d} win={s['win_pct']:6.2f}% PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f} forced={forced}",flush=True)
+    pd.DataFrame(rr_rows).to_csv(outdir/f"{symbol}_{tf_name}_rr_grid.csv",index=False)
     return out
 
 
