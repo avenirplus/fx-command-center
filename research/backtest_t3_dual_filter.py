@@ -46,7 +46,7 @@ def build_base(b):
         else:
             kl=np.searchsorted(lpt,cutoff,side="right")
             if kl<1: continue
-            bi=int(lp4[kl-1]); kh=np.searchsorted(hpt,bi,side="left")
+            bi=int(lp4[kl-1]); kh=np.searchsorted(hp4,bi,side="left")
             if kh<1: continue
             ai=int(hp4[kh-1]); A=highs4[ai]; B=lows4[bi]
             if A<=B: continue
