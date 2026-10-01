@@ -1,0 +1,44 @@
+name: Research GO_SCAL package inspect
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/research-goscal-inspect.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official GO_SCAL MT5 package
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 -o /tmp/gosca53.zip https://theessential-fx.com/gosca53.zip
+          sha256sum /tmp/gosca53.zip
+          unzip -l /tmp/gosca53.zip
+          mkdir -p /tmp/gosca53
+          unzip -q /tmp/gosca53.zip -d /tmp/gosca53
+      - name: Inspect text/config files
+        run: |
+          set -euo pipefail
+          echo '=== FILE TREE ==='
+          find /tmp/gosca53 -type f -printf '%P\n' | sort
+          echo '=== TEXT CONFIGS ==='
+          while IFS= read -r f; do
+            echo "--- $f ---"
+            sed -n '1,240p' "$f" || true
+          done < <(find /tmp/gosca53 -type f \( -iname '*.tpl' -o -iname '*.set' -o -iname '*.ini' -o -iname '*.txt' -o -iname '*.csv' \) | sort)
+      - name: Extract readable input-like strings from EX5
+        run: |
+          set -euo pipefail
+          echo '=== EX5 READABLE STRINGS ==='
+          while IFS= read -r f; do
+            echo "--- $f ---"
+            strings -el -n 4 "$f" | grep -E -i 'EMA|Stoch|Ichimoku|Signal|Body|Wick|Ratio|Cool|Dollar|Alert|Push|Mail|Period|Input|High|Low|ATR|Thrust|Go_scal' | head -300 || true
+            strings -n 4 "$f" | grep -E -i 'EMA|Stoch|Ichimoku|Signal|Body|Wick|Ratio|Cool|Dollar|Alert|Push|Mail|Period|Input|High|Low|ATR|Thrust|Go_scal' | head -300 || true
+          done < <(find /tmp/gosca53 -type f -iname '*.ex5' | sort)
