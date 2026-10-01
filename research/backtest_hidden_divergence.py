@@ -217,17 +217,37 @@ def run_tf(symbol,b,tf_name,lookback,counter_bars,max_hold,outdir):
     masks,direction,av=build_masks(b,lookback,counter_bars)
     summary_rows=[]
     all_trades={}
+    era_rows=[]
+    side_rows=[]
     for name,mask in masks.items():
         tr=eval_trades(b,mask,direction,av,max_hold)
         all_trades[name]=tr
         s=summarize(tr)
         summary_rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,**s})
         print(f"{name:24s} n={s['trades']:5d} win={s['win_pct']:6.2f}% PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} maxDD={s['max_dd_r']:.1f} timeouts={s['timeouts']}",flush=True)
+        if not tr.empty:
+            years=pd.to_datetime(tr["signal_time"]).dt.year
+            eras=np.select([years<=2018, years<=2022],["2015-2018","2019-2022"],default="2023-2026")
+            tmp=tr.copy()
+            tmp["era"]=eras
+            for era,g in tmp.groupby("era"):
+                era_rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,"era":era,**summarize(g)})
+            for d,g in tr.groupby("direction"):
+                side_rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,"side":"LONG" if d==1 else "SHORT",**summarize(g)})
 
     summ=pd.DataFrame(summary_rows)
     summ.to_csv(outdir/f"{symbol}_{tf_name}_summary.csv",index=False)
+    pd.DataFrame(era_rows).to_csv(outdir/f"{symbol}_{tf_name}_era_stability.csv",index=False)
+    pd.DataFrame(side_rows).to_csv(outdir/f"{symbol}_{tf_name}_side_all_filters.csv",index=False)
 
-    # Stability breakdown for the current leading filter.
+    print("\nEra stability (all filters):")
+    for row in era_rows:
+        print(f"ERA {row['filter']:24s} {row['era']}: n={row['trades']:4d} win={row['win_pct']:6.2f}% PF={row['pf']:7.3f} avgR={row['avg_r']:+.4f}")
+    print("\nSide stability (all filters):")
+    for row in side_rows:
+        print(f"SIDE {row['filter']:24s} {row['side']:5s}: n={row['trades']:4d} win={row['win_pct']:6.2f}% PF={row['pf']:7.3f} avgR={row['avg_r']:+.4f}")
+
+    # Detailed yearly breakdown for MACD histogram hidden divergence.
     key="MACD_hist_hidden"
     tr=all_trades[key].copy()
     if not tr.empty:
@@ -236,17 +256,10 @@ def run_tf(symbol,b,tf_name,lookback,counter_bars,max_hold,outdir):
         for y,g in tr.groupby("year"):
             yr.append({"symbol":symbol,"timeframe":tf_name,"year":int(y),**summarize(g)})
         pd.DataFrame(yr).to_csv(outdir/f"{symbol}_{tf_name}_MACD_hidden_yearly.csv",index=False)
-        side=[]
-        for d,g in tr.groupby("direction"):
-            side.append({"symbol":symbol,"timeframe":tf_name,"side":"LONG" if d==1 else "SHORT",**summarize(g)})
-        pd.DataFrame(side).to_csv(outdir/f"{symbol}_{tf_name}_MACD_hidden_side.csv",index=False)
         tr.to_csv(outdir/f"{symbol}_{tf_name}_MACD_hidden_trades.csv",index=False)
         print("\nYearly MACD histogram hidden:")
         for row in yr:
             print(f"{row['year']}: n={row['trades']:4d} win={row['win_pct']:6.2f}% PF={row['pf']:7.3f} avgR={row['avg_r']:+.4f}")
-        print("\nSide MACD histogram hidden:")
-        for row in side:
-            print(f"{row['side']:5s}: n={row['trades']:4d} win={row['win_pct']:6.2f}% PF={row['pf']:7.3f} avgR={row['avg_r']:+.4f}")
     return summ
 
 def main():
