@@ -404,8 +404,10 @@ def main():
     s1=run_tf(args.symbol,h1,"H1",lookback=30,counter_bars=3,max_hold=48,outdir=out)
     # M15 external variant: preserve the same clock-time horizons: 120 bars=30h, 12 bars=3h, 192 bars=48h.
     s15=run_tf(args.symbol,m15,"M15_time_equiv",lookback=120,counter_bars=12,max_hold=192,outdir=out)
+    # Proper Fibonacci validation: confirmed H4 impulse swing A->B, then H1 50-61.8% retracement.
+    sh4=run_h4_swing(args.symbol,h1,out)
 
-    combo=pd.concat([s1,s15],ignore_index=True)
+    combo=pd.concat([s1,s15,sh4],ignore_index=True)
     combo.to_csv(out/f"{args.symbol}_combined_summary.csv",index=False)
     print("\n=== COMBINED SUMMARY ===")
     print(combo.to_string(index=False))
