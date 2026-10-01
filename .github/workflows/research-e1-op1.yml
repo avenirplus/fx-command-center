@@ -1,0 +1,36 @@
+name: Research E1 OP1 support reversal
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/backtest_e1_op1_support_reversal.py"
+      - ".github/workflows/research-e1-op1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  e1op1:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [USDJPY, XAUUSD]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6"
+      - name: Run E1 OP1
+        run: python research/backtest_e1_op1_support_reversal.py --symbol "${{ matrix.symbol }}"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e1-op1-${{ matrix.symbol }}
+          path: research/results/
+          retention-days: 14
