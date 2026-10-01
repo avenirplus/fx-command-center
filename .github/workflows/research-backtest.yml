@@ -6,6 +6,7 @@ on:
     paths:
       - "research/backtest_hidden_divergence.py"
       - "research/backtest_trend_modes.py"
+      - "research/backtest_sensitivity.py"
       - ".github/workflows/research-backtest.yml"
 
 permissions:
@@ -40,6 +41,10 @@ jobs:
       - name: Run pre-registered F1 trend-mode comparison
         run: |
           python research/backtest_trend_modes.py --symbol "${{ matrix.symbol }}"
+
+      - name: Run T2 MACD sensitivity robustness test
+        run: |
+          python research/backtest_sensitivity.py --symbol "${{ matrix.symbol }}"
 
       - name: Upload research results
         if: always()
