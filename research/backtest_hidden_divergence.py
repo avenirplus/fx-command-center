@@ -518,6 +518,23 @@ def run_h4_swing(symbol,b,outdir):
                     tc["R"]=tc["R"]-cost_r
                 s=summarize(tc)
                 print(f"COSTSTRESS {name:24s} TP={tp_r:4.2f}R cost={cost_r:4.2f}R n={s['trades']:4d} PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f}",flush=True)
+
+    # Side and coarse broker-time diagnostics. Exploratory only.
+    for name in ["candidate_50_61_8","MACD_hist_hidden"]:
+        for tp_r in [1.25,2.00]:
+            tr,skipped=eval_trades_rr_nonoverlap(b,masks[name],direction,av,48,tp_r)
+            if tr.empty:
+                continue
+            for d,g in tr.groupby("direction"):
+                s=summarize(g)
+                side="LONG" if d==1 else "SHORT"
+                print(f"SIDEDIAG {name:24s} TP={tp_r:4.2f}R {side:5s}: n={s['trades']:3d} PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f}",flush=True)
+            et=pd.to_datetime(tr["entry_time"])
+            td=tr.copy()
+            td["hbin"]=(et.dt.hour//4)*4
+            for hb,g in td.groupby("hbin"):
+                s=summarize(g)
+                print(f"TIMEDIAG {name:24s} TP={tp_r:4.2f}R EET/EEST {int(hb):02d}-{int(hb)+3:02d}: n={s['trades']:3d} PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f}",flush=True)
     return out
 
 
