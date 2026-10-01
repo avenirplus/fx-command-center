@@ -1,0 +1,57 @@
+name: Research GO_SCAL template parse
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/research-goscal-template-parse.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  parse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download package with retries
+        run: |
+          set -euo pipefail
+          for i in 1 2 3 4 5; do
+            echo TRY=$i
+            if curl -L --connect-timeout 20 --max-time 120 --fail -o /tmp/gosca53.zip https://theessential-fx.com/gosca53.zip; then break; fi
+            sleep $((i*2))
+          done
+          test -s /tmp/gosca53.zip
+          unzip -q /tmp/gosca53.zip -d /tmp/gosca53
+      - name: Parse templates
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          for p in sorted(Path('/tmp/gosca53').rglob('*.tpl')):
+              print('\n===',p.name,'===')
+              raw=p.read_bytes()
+              txt=None
+              for enc in ('utf-16le','utf-16','utf-8','cp932','latin1'):
+                  try:
+                      txt=raw.decode(enc)
+                      if '<chart>' in txt.lower() or '<indicator>' in txt.lower() or 'name=' in txt.lower():
+                          break
+                  except Exception:
+                      pass
+              if txt is None:
+                  continue
+              # Print compact but complete settings lines.
+              for line in txt.splitlines():
+                  s=line.strip().replace('\x00','')
+                  if not s: continue
+                  if any(k in s.lower() for k in [
+                      '<chart','</chart','<window','</window','<indicator','</indicator',
+                      'name=','period=','method=','apply=','shift=','value=','levels=','symbol=','scale=',
+                      'color=','style=','weight=','show_data=','input','parameter','timeframe','digits=',
+                      'tenkan','kijun','senkou','ema','ma','ichimoku','prevday','go_scal'
+                  ]):
+                      print(s)
+          PY
