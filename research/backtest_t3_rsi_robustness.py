@@ -88,6 +88,8 @@ def run(symbol,b,outdir):
             if not tc.empty: tc["R"]=tc["R"]-0.05
             sc=summarize(tc)
             rows.append({"symbol":symbol,"band":band,"fib_lo":flo,"fib_hi":fhi,"pivot_l":L,"skipped":skip,**s,"pf_cost_005R":sc["pf"],"avg_r_cost_005R":sc["avg_r"]})
+            if band=="base" and L==2:
+                tr.assign(symbol=symbol).to_csv(outdir/f"{symbol}_T3_RSI_base_trades.csv",index=False)
             print(f"RSIROB {symbol} band={band:6s}[{flo:.3f},{fhi:.3f}] L={L} n={s['trades']:3d} PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f} PF@0.05R={sc['pf']:7.3f}")
             if not tr.empty:
                 years=pd.to_datetime(tr["signal_time"]).dt.year
