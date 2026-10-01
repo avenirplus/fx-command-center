@@ -12,6 +12,10 @@ permissions:
 
 jobs:
   london:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [USDJPY, XAUUSD]
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
@@ -22,11 +26,11 @@ jobs:
       - name: Install
         run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6" "tzdata>=2025.2"
       - name: Run London breakout
-        run: python research/backtest_london_breakout.py
+        run: python research/backtest_london_breakout.py --symbol "${{ matrix.symbol }}"
       - name: Upload
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: london-breakout-usdjpy
+          name: london-breakout-${{ matrix.symbol }}
           path: research/results/
           retention-days: 14
