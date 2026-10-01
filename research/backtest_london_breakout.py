@@ -28,25 +28,35 @@ def attach_timezone(df, tzname):
     x=x[~x.index.duplicated(keep="last")].sort_index()
     return x
 
-def build_bars(m1_london):
-    m15=m1_london.resample("15min",label="left",closed="left").agg(OHLC).dropna()
-    h1=m1_london.resample("1h",label="left",closed="left").agg(OHLC).dropna()
+def build_bars_once(m1):
+    m15=m1.resample("15min",label="left",closed="left").agg(OHLC).dropna()
+    h1=m1.resample("1h",label="left",closed="left").agg(OHLC).dropna()
     ah=atr_wilder(h1,14)
-    # Last completed H1 only.
     atr15=ah.shift(1).reindex(m15.index,method="ffill")
-    return m15,atr15
+    m15=m15.copy()
+    m15["ATR_LAST_H1"]=atr15
+    return m15
 
-def sim_one_mode(m15,atr15):
+def relabel_to_london(m15_naive,tzname):
+    x=m15_naive.copy()
+    idx=x.index.tz_localize(tzname,ambiguous="NaT",nonexistent="NaT")
+    keep=~idx.isna()
+    x=x.loc[keep].copy()
+    x.index=idx[keep].tz_convert("Europe/London")
+    x=x[~x.index.duplicated(keep="last")].sort_index()
+    return x
+
+def sim_one_mode(m15):
     O=m15["Open"].to_numpy(float); H=m15["High"].to_numpy(float)
     L=m15["Low"].to_numpy(float); C=m15["Close"].to_numpy(float)
-    A=atr15.to_numpy(float); T=m15.index
+    A=m15["ATR_LAST_H1"].to_numpy(float); T=m15.index
     trades=[]
 
-    # Group index positions by London local calendar date.
-    dates=np.array([ts.date() for ts in T],dtype=object)
-    unique_dates=pd.unique(dates)
-    for day in unique_dates:
-        pos=np.flatnonzero(dates==day)
+    groups={}
+    for i,ts in enumerate(T):
+        groups.setdefault(ts.date(),[]).append(i)
+    for day,poslist in groups.items():
+        pos=np.asarray(poslist,dtype=int)
         if len(pos)==0: continue
         rpos=[i for i in pos if 0 <= T[i].hour < 8]
         wpos=[i for i in pos if 8 <= T[i].hour < 12]
@@ -123,12 +133,13 @@ def main():
     z=work/f"{SYMBOL}_bid.zip"
     if not z.exists(): z=download_zip(SYMBOL,work)
     m1=read_m1(z)
+    m15_naive=build_bars_once(m1)
+    del m1
 
     rows=[]
     for mode,tzname in TZ_MODES.items():
-        x=attach_timezone(m1,tzname)
-        m15,a15=build_bars(x)
-        tr=sim_one_mode(m15,a15)
+        m15=relabel_to_london(m15_naive,tzname)
+        tr=sim_one_mode(m15)
         s=stat(tr)
         print(f"LB {mode:10s} n={s['trades']:4d} win={s['win_pct']:6.2f}% PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f}")
         era_rows(tr,mode)
