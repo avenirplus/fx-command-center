@@ -51,7 +51,7 @@ jobs:
                       '<chart','</chart','<window','</window','<indicator','</indicator',
                       'name=','period=','method=','apply=','shift=','value=','levels=','symbol=','scale=',
                       'color=','style=','weight=','show_data=','input','parameter','timeframe','digits=',
-                      'tenkan','kijun','senkou','ema','ma','ichimoku','prevday','go_scal'
+                      'tenkan','kijun','senkou','ema','ma','ichimoku','prevday','go_scal','slowing','levels','level1','level2','level3'
                   ]):
                       print(s)
           PY
