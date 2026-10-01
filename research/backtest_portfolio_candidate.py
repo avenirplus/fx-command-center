@@ -62,7 +62,8 @@ def main():
         combo=pd.concat([by["USDJPY"],by["XAUUSD"]],ignore_index=True)
         z,ps,annual=portfolio_stats(combo)
         print(f"PORTCOMBO {mode} n={ps['trades']} sumR={ps['sum_r']:+.2f} avgR={ps['avg_r']:+.4f} maxDD={ps['max_dd_r']:.2f} active_years={ps['years']}")
-        print(f"PORTFREQ {mode} trades_per_calendar_year={ps['trades']/12.75:.2f}")
+        span_years=(pd.to_datetime(combo["entry_time"]).max()-pd.to_datetime(combo["entry_time"]).min()).total_seconds()/(365.2425*24*3600)
+        print(f"PORTFREQ {mode} span_years={span_years:.3f} trades_per_year={ps['trades']/span_years:.2f}")
         print(f"PORTOVERLAP {mode} USDJPY entries within 48h of XAUUSD entry={overlap_count(by['USDJPY'],by['XAUUSD'],48)}/{len(by['USDJPY'])}")
         print("PORTANNUAL "+mode)
         for y,row in annual.iterrows():
