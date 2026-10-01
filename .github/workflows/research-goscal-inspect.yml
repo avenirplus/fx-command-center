@@ -28,11 +28,12 @@ jobs:
           set -euo pipefail
           echo '=== FILE TREE ==='
           find /tmp/gosca53 -type f -printf '%P\n' | sort
-          echo '=== TEXT CONFIGS ==='
+          echo '=== TEMPLATE SETTINGS ==='
           while IFS= read -r f; do
             echo "--- $f ---"
-            sed -n '1,240p' "$f" || true
-          done < <(find /tmp/gosca53 -type f \( -iname '*.tpl' -o -iname '*.set' -o -iname '*.ini' -o -iname '*.txt' -o -iname '*.csv' \) | sort)
+            file "$f" || true
+            iconv -f UTF-16LE -t UTF-8 "$f" 2>/dev/null | grep -E -i 'indicator|name=|period|method|apply|signal|stoch|ichimoku|ema|ma_|kperiod|dperiod|slowing|level|parameter|input|high|low|alert|mail|push|dollar|ratio|cool|body|wick' | head -500 || true
+          done < <(find /tmp/gosca53 -type f -iname '*.tpl' | sort)
       - name: Extract readable input-like strings from EX5
         run: |
           set -euo pipefail
