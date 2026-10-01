@@ -1,0 +1,57 @@
+name: Research GO_SCAL captions via Piped
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/research-goscal-piped.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  captions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query Piped instances
+        run: |
+          python - <<'PY'
+          import json, urllib.request, ssl, re
+          vid='1uTo6hByhsY'
+          bases=[
+            'https://pipedapi.kavin.rocks',
+            'https://pipedapi.adminforge.de',
+            'https://pipedapi.reallyaweso.me',
+            'https://pipedapi.leptons.xyz',
+            'https://pipedapi-libre.kavin.rocks',
+          ]
+          hdr={'User-Agent':'Mozilla/5.0'}
+          for base in bases:
+            print('=== INSTANCE',base,'===')
+            try:
+              req=urllib.request.Request(f'{base}/streams/{vid}',headers=hdr)
+              with urllib.request.urlopen(req,timeout=25) as r:
+                data=json.load(r)
+              print('TITLE',data.get('title'))
+              subs=data.get('subtitles') or []
+              print('SUBS',json.dumps(subs,ensure_ascii=False)[:8000])
+              for s in subs:
+                if str(s.get('code','')).startswith('ja') or 'Japanese' in str(s.get('name','')):
+                  u=s.get('url')
+                  if not u: continue
+                  print('FETCH',u)
+                  req2=urllib.request.Request(u,headers=hdr)
+                  with urllib.request.urlopen(req2,timeout=25) as rr:
+                    txt=rr.read().decode('utf-8','ignore')
+                  print('CAPTION_START')
+                  print(txt[:60000])
+                  print('CAPTION_END')
+                  raise SystemExit(0)
+            except SystemExit:
+              raise
+            except Exception as e:
+              print('ERROR',repr(e))
+          print('NO_JA_CAPTION_FOUND')
+          PY
