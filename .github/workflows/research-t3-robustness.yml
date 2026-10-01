@@ -1,0 +1,36 @@
+name: Research T3 robustness
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/backtest_t3_robustness.py"
+      - ".github/workflows/research-t3-robustness.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  t3:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [USDJPY, XAUUSD]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6"
+      - name: Run T3 robustness
+        run: python research/backtest_t3_robustness.py --symbol "${{ matrix.symbol }}"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t3-robustness-${{ matrix.symbol }}
+          path: research/results/
+          retention-days: 14
