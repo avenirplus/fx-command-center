@@ -78,6 +78,8 @@ def run(symbol,b,outdir):
         if not tc.empty: tc["R"]=tc["R"]-0.05
         sc=summarize(tc)
         rows.append({"symbol":symbol,"trend_mode":mode,"trades":s["trades"],"pf":s["pf"],"avg_r":s["avg_r"],"max_dd_r":s["max_dd_r"],"pf_cost_005R":sc["pf"]})
+        if mode=="T2_HHHL":
+            tr.assign(symbol=symbol).to_csv(outdir/f"{symbol}_T2_RSI_base_trades.csv",index=False)
         print(f"RSITREND {symbol} {mode:11s} n={s['trades']:3d} PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f} PF@0.05R={sc['pf']:7.3f}")
         if not tr.empty:
             yrs=pd.to_datetime(tr["signal_time"]).dt.year
