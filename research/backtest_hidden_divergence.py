@@ -262,6 +262,127 @@ def run_tf(symbol,b,tf_name,lookback,counter_bars,max_hold,outdir):
             print(f"{row['year']}: n={row['trades']:4d} win={row['win_pct']:6.2f}% PF={row['pf']:7.3f} avgR={row['avg_r']:+.4f}")
     return summ
 
+def build_masks_h4_swing(b: pd.DataFrame):
+    trend=h4_trend_from(b)
+    av=atr_wilder(b,14)
+    mh=macd_hist(b["Close"])
+    cv=cci(b,20)
+
+    h4=b.resample("4h",label="left",closed="left").agg(OHLC).dropna()
+    h4_low_piv,h4_high_piv=pivot_arrays(h4)
+    h4_times=h4.index
+    h4_lows=h4["Low"].to_numpy(float)
+    h4_highs=h4["High"].to_numpy(float)
+
+    close=b["Close"].to_numpy(float)
+    high=b["High"].to_numpy(float)
+    low=b["Low"].to_numpy(float)
+    times=b.index
+    tv=trend.to_numpy(np.int8)
+    avv=av.to_numpy(float)
+
+    candidate=np.zeros(len(b),dtype=bool)
+    direction=np.zeros(len(b),dtype=np.int8)
+
+    # H4 pivot at bar t is usable only after two right-side H4 bars have fully closed.
+    # With left-labeled 4h bars this is t + 12h, a conservative no-lookahead cutoff.
+    h4_low_times=h4_times[h4_low_piv]
+    h4_high_times=h4_times[h4_high_piv]
+
+    for i in range(4,len(b)):
+        d=int(tv[i])
+        if d==0 or not np.isfinite(avv[i]):
+            continue
+        t=times[i]
+        cutoff=t-pd.Timedelta(hours=12)
+        if d==1:
+            kh=np.searchsorted(h4_high_times,cutoff,side="right")
+            if kh<1: continue
+            bi=int(h4_high_piv[kh-1])
+            kl=np.searchsorted(h4_low_piv,bi,side="left")
+            if kl<1: continue
+            ai=int(h4_low_piv[kl-1])
+            A=h4_lows[ai]; B=h4_highs[bi]
+            if not (B>A): continue
+            depth=(B-close[i])/(B-A)
+            if not (0.50<=depth<=0.618): continue
+            counter=close[i-1] < close[i-4]
+            pull=(B-low[i]) >= 0.75*avv[i]
+            trigger=close[i] > high[i-1]
+        else:
+            kl=np.searchsorted(h4_low_times,cutoff,side="right")
+            if kl<1: continue
+            bi=int(h4_low_piv[kl-1])
+            kh=np.searchsorted(h4_high_piv,bi,side="left")
+            if kh<1: continue
+            ai=int(h4_high_piv[kh-1])
+            A=h4_highs[ai]; B=h4_lows[bi]
+            if not (A>B): continue
+            depth=(close[i]-B)/(A-B)
+            if not (0.50<=depth<=0.618): continue
+            counter=close[i-1] > close[i-4]
+            pull=(high[i]-B) >= 0.75*avv[i]
+            trigger=close[i] < low[i-1]
+        if counter and pull and trigger:
+            candidate[i]=True
+            direction[i]=d
+
+    low_piv,high_piv=pivot_arrays(b)
+    mhv=mh.to_numpy(float); ccv=cv.to_numpy(float)
+    price_struct=np.zeros(len(b),dtype=bool)
+    cci_hidden=np.zeros(len(b),dtype=bool)
+    macd_hidden=np.zeros(len(b),dtype=bool)
+
+    for i in np.flatnonzero(candidate):
+        d=int(direction[i])
+        piv=low_piv if d==1 else high_piv
+        k=np.searchsorted(piv,i-2,side="right")
+        if k<2: continue
+        p1,p2=int(piv[k-2]),int(piv[k-1])
+        if d==1:
+            ps=low[p2] > low[p1]
+            ch=np.isfinite(ccv[p1]) and np.isfinite(ccv[p2]) and ccv[p2] < ccv[p1]
+            mhid=np.isfinite(mhv[p1]) and np.isfinite(mhv[p2]) and mhv[p2] < mhv[p1]
+        else:
+            ps=high[p2] < high[p1]
+            ch=np.isfinite(ccv[p1]) and np.isfinite(ccv[p2]) and ccv[p2] > ccv[p1]
+            mhid=np.isfinite(mhv[p1]) and np.isfinite(mhv[p2]) and mhv[p2] > mhv[p1]
+        price_struct[i]=ps
+        cci_hidden[i]=ps and ch
+        macd_hidden[i]=ps and mhid
+
+    masks={
+        "candidate_50_61_8":candidate,
+        "price_HL_LH":candidate & price_struct,
+        "CCI_hidden":candidate & cci_hidden,
+        "MACD_hist_hidden":candidate & macd_hidden,
+        "CCI_and_MACD_hidden":candidate & cci_hidden & macd_hidden,
+    }
+    return masks,direction,av
+
+
+def run_h4_swing(symbol,b,outdir):
+    tf_name="H1_H4swing"
+    print(f"\n=== {symbol} {tf_name} rows={len(b):,} ===",flush=True)
+    masks,direction,av=build_masks_h4_swing(b)
+    rows=[]
+    for name,mask in masks.items():
+        tr=eval_trades(b,mask,direction,av,48)
+        s=summarize(tr)
+        rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,**s})
+        print(f"H4SW {name:24s} n={s['trades']:5d} win={s['win_pct']:6.2f}% PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} maxDD={s['max_dd_r']:.1f} timeouts={s['timeouts']}",flush=True)
+        if not tr.empty:
+            years=pd.to_datetime(tr["signal_time"]).dt.year
+            eras=np.select([years<=2018,years<=2022],["2015-2018","2019-2022"],default="2023-2026")
+            tmp=tr.copy(); tmp["era"]=eras
+            for era,g in tmp.groupby("era"):
+                es=summarize(g)
+                print(f"H4ERA {name:24s} {era}: n={es['trades']:4d} win={es['win_pct']:6.2f}% PF={es['pf']:7.3f} avgR={es['avg_r']:+.4f}")
+    out=pd.DataFrame(rows)
+    out.to_csv(outdir/f"{symbol}_{tf_name}_summary.csv",index=False)
+    return out
+
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument("--symbol",choices=["USDJPY","XAUUSD"],required=True)
