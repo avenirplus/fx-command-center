@@ -11,6 +11,9 @@ from backtest_hidden_divergence import (
 from backtest_trend_modes import structure_trend
 
 def pivots_l(b, L):
+    # L=2 must exactly reproduce the canonical pivot implementation used by the base test.
+    if L == 2:
+        return pivot_arrays(b)
     lo=b["Low"].to_numpy(float); hi=b["High"].to_numpy(float)
     pl=np.ones(len(b),dtype=bool); ph=np.ones(len(b),dtype=bool)
     pl[:L]=False; pl[len(b)-L:]=False
