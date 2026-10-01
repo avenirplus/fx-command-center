@@ -5,7 +5,6 @@ import pandas as pd
 
 from backtest_hidden_divergence import download_zip, read_m1, summarize, atr_wilder
 
-SYMBOL="USDJPY"
 TZ_MODES={
     "UTC":"UTC",
     "UTC_PLUS_2":"Etc/GMT-2",
@@ -128,10 +127,15 @@ def era_rows(tr,mode):
     return out
 
 def main():
+    import argparse
+    ap=argparse.ArgumentParser()
+    ap.add_argument("--symbol",choices=["USDJPY","XAUUSD"],required=True)
+    args=ap.parse_args()
+    symbol=args.symbol
     work=Path("_research_work");work.mkdir(exist_ok=True)
     out=Path("research/results");out.mkdir(parents=True,exist_ok=True)
-    z=work/f"{SYMBOL}_bid.zip"
-    if not z.exists(): z=download_zip(SYMBOL,work)
+    z=work/f"{symbol}_bid.zip"
+    if not z.exists(): z=download_zip(symbol,work)
     m1=read_m1(z)
     m15_naive=build_bars_once(m1)
     del m1
@@ -151,8 +155,8 @@ def main():
         reasons=tr["reason"].value_counts().to_dict() if not tr.empty else {}
         print(f"LBREASON {mode:10s} {reasons}")
         rows.append({"mode":mode,**s,**{f"reason_{k}":v for k,v in reasons.items()}})
-        tr.to_csv(out/f"USDJPY_LondonBreakout_{mode}_trades.csv",index=False)
-    pd.DataFrame(rows).to_csv(out/"USDJPY_LondonBreakout_timezone_summary.csv",index=False)
+        tr.to_csv(out/f"{symbol}_LondonBreakout_{mode}_trades.csv",index=False)
+    pd.DataFrame(rows).to_csv(out/f"{symbol}_LondonBreakout_timezone_summary.csv",index=False)
 
 if __name__=="__main__":
     main()
