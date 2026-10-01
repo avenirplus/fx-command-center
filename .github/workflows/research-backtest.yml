@@ -1,0 +1,46 @@
+name: Research hidden-divergence backtest
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/backtest_hidden_divergence.py"
+      - ".github/workflows/research-backtest.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  backtest:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [USDJPY, XAUUSD]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6"
+
+      - name: Run reconstructed cross-market backtest
+        run: |
+          python research/backtest_hidden_divergence.py --symbol "${{ matrix.symbol }}"
+
+      - name: Upload research results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hidden-divergence-${{ matrix.symbol }}
+          path: research/results/
+          if-no-files-found: warn
+          retention-days: 14
