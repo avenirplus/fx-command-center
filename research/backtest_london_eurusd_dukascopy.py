@@ -70,7 +70,42 @@ def fetch_month(side,start,end):
             time.sleep(2*(attempt+1))
     raise RuntimeError(f"failed {side_name} {start:%Y-%m}: {last}")
 
+def normalize_df(df):
+    df=df.copy()
+    if not isinstance(df.index,pd.DatetimeIndex):
+        if "timestamp" in df.columns:
+            df["timestamp"]=pd.to_datetime(df["timestamp"],utc=True)
+            df=df.set_index("timestamp")
+        else:
+            df.index=pd.to_datetime(df.index,utc=True)
+    if df.index.tz is not None:
+        df.index=df.index.tz_convert("UTC").tz_localize(None)
+    else:
+        df.index=df.index.tz_localize(None)
+    df.columns=[str(x).lower() for x in df.columns]
+    keep=[x for x in ["open","high","low","close","volume"] if x in df.columns]
+    return df[keep].loc[~df.index.duplicated(keep="last")].sort_index()
+
 def load_side(side):
+    side_name="bid" if side==dukascopy_python.OFFER_SIDE_BID else "ask"
+    try:
+        print(f"FAST_FETCH {side_name} full range",flush=True)
+        z=dukascopy_python.fetch(
+            instrument=INSTRUMENT_FX_MAJORS_EUR_USD,
+            interval=dukascopy_python.INTERVAL_MIN_15,
+            offer_side=side,
+            start=START.to_pydatetime(),
+            end=END.to_pydatetime(),
+            max_retries=5,
+        )
+        z=normalize_df(z)
+        z=z[(z.index>=START)&(z.index<END)]
+        if len(z)>100000:
+            print(f"FAST_FETCH_OK {side_name} rows={len(z)}",flush=True)
+            return z
+        raise RuntimeError(f"unexpected short full fetch rows={len(z)}")
+    except Exception as e:
+        print(f"FAST_FETCH_FALLBACK {side_name}: {e}",flush=True)
     chunks=[]
     for s,e in month_starts(START,END):
         chunks.append(fetch_month(side,s,e))
