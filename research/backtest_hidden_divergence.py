@@ -310,6 +310,43 @@ def eval_trades_rr(b, signal_mask, direction, atr, max_hold, tp_r):
     return pd.DataFrame(rows,columns=["signal_time","entry_time","direction","R","reason"])
 
 
+def eval_trades_rr_nonoverlap(b, signal_mask, direction, atr, max_hold, tp_r):
+    sig=np.flatnonzero(signal_mask)
+    rows=[]; blocked_until=-1; skipped=0
+    o=b["Open"].to_numpy(float); h=b["High"].to_numpy(float); l=b["Low"].to_numpy(float); cl=b["Close"].to_numpy(float)
+    av=atr.to_numpy(float); times=b.index
+    for i in sig:
+        if i+1<=blocked_until:
+            skipped+=1
+            continue
+        if i+1>=len(b) or not np.isfinite(av[i]) or av[i]<=0:
+            continue
+        d=int(direction[i])
+        if d not in (-1,1):
+            continue
+        entry=o[i+1]; risk=av[i]
+        tp=entry+d*tp_r*risk; sl=entry-d*risk
+        last=min(i+1+max_hold,len(b)-1)
+        r=None; exit_i=last; reason="TIME"
+        for j in range(i+1,last+1):
+            if d==1:
+                if l[j]<=sl:
+                    r=-1.0; exit_i=j; reason="SL"; break
+                if h[j]>=tp:
+                    r=float(tp_r); exit_i=j; reason="TP"; break
+            else:
+                if h[j]>=sl:
+                    r=-1.0; exit_i=j; reason="SL"; break
+                if l[j]<=tp:
+                    r=float(tp_r); exit_i=j; reason="TP"; break
+        if r is None:
+            r=float(d*(cl[last]-entry)/risk)
+        blocked_until=exit_i
+        rows.append((times[i],times[i+1],times[exit_i],d,r,reason))
+    tr=pd.DataFrame(rows,columns=["signal_time","entry_time","exit_time","direction","R","reason"])
+    return tr,skipped
+
+
 def build_masks_h4_swing(b: pd.DataFrame):
     trend=h4_trend_from(b)
     av=atr_wilder(b,14)
@@ -449,6 +486,38 @@ def run_h4_swing(symbol,b,outdir):
                     es=summarize(g)
                     print(f"RRERA {name:24s} TP={tp_r:4.2f}R {era}: n={es['trades']:3d} win={es['win_pct']:6.2f}% PF={es['pf']:7.3f} avgR={es['avg_r']:+.4f}",flush=True)
     pd.DataFrame(rr_rows).to_csv(outdir/f"{symbol}_{tf_name}_rr_grid.csv",index=False)
+
+    # Realism check: only one open trade per symbol. Signals arriving before exit are ignored.
+    non_rows=[]
+    for name in ["candidate_50_61_8","price_HL_LH","MACD_hist_hidden","CCI_and_MACD_hidden"]:
+        mask=masks[name]
+        for tp_r in [0.50,0.75,1.00,1.25,1.50,2.00]:
+            tr,skipped=eval_trades_rr_nonoverlap(b,mask,direction,av,48,tp_r)
+            s=summarize(tr)
+            wins=int((tr["R"]>0).sum()) if not tr.empty else 0
+            p0,pval,ci_lo,ci_hi=binom_diagnostic(wins,len(tr),tp_r)
+            non_rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,"tp_r":tp_r,"skipped_overlap":skipped,"breakeven_win_p":p0,"binom_p_one_sided":pval,"win_ci95_lo":ci_lo,"win_ci95_hi":ci_hi,**s})
+            print(f"NONGRID {name:24s} TP={tp_r:4.2f}R n={s['trades']:4d} skip={skipped:3d} win={s['win_pct']:6.2f}% PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f} p={pval:.4f}",flush=True)
+            if not tr.empty:
+                years=pd.to_datetime(tr["signal_time"]).dt.year
+                eras=np.select([years<=2018,years<=2022],["2015-2018","2019-2022"],default="2023-2026")
+                et=tr.copy(); et["era"]=eras
+                for era,g in et.groupby("era"):
+                    es=summarize(g)
+                    print(f"NONERA {name:24s} TP={tp_r:4.2f}R {era}: n={es['trades']:3d} PF={es['pf']:7.3f} avgR={es['avg_r']:+.4f}",flush=True)
+    pd.DataFrame(non_rows).to_csv(outdir/f"{symbol}_{tf_name}_rr_grid_nonoverlap.csv",index=False)
+
+    # Synthetic friction stress only (not a substitute for real Ask quotes).
+    # Cost is expressed as a fixed fraction of entry ATR per round trip.
+    for name in ["candidate_50_61_8","MACD_hist_hidden"]:
+        for tp_r in [1.25,2.00]:
+            tr,skipped=eval_trades_rr_nonoverlap(b,masks[name],direction,av,48,tp_r)
+            for cost_r in [0.00,0.02,0.05,0.10,0.15]:
+                tc=tr.copy()
+                if not tc.empty:
+                    tc["R"]=tc["R"]-cost_r
+                s=summarize(tc)
+                print(f"COSTSTRESS {name:24s} TP={tp_r:4.2f}R cost={cost_r:4.2f}R n={s['trades']:4d} PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f}",flush=True)
     return out
 
 
