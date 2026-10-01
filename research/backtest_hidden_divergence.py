@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import argparse, os, sys, zipfile
+import argparse, os, sys, zipfile, math
 from pathlib import Path
 
 import gdown
@@ -262,6 +262,20 @@ def run_tf(symbol,b,tf_name,lookback,counter_bars,max_hold,outdir):
             print(f"{row['year']}: n={row['trades']:4d} win={row['win_pct']:6.2f}% PF={row['pf']:7.3f} avgR={row['avg_r']:+.4f}")
     return summ
 
+def binom_diagnostic(wins, n, tp_r):
+    if n<=0:
+        return (np.nan,np.nan,np.nan,np.nan)
+    p0=1.0/(1.0+tp_r)
+    # One-sided P[X >= wins] at the zero-cost break-even win rate.
+    p=sum(math.comb(n,k)*(p0**k)*((1-p0)**(n-k)) for k in range(wins,n+1))
+    ph=wins/n
+    z=1.959963984540054
+    den=1+z*z/n
+    center=(ph+z*z/(2*n))/den
+    half=z*math.sqrt((ph*(1-ph)+z*z/(4*n))/n)/den
+    return p0,p,max(0.0,center-half),min(1.0,center+half)
+
+
 def eval_trades_rr(b, signal_mask, direction, atr, max_hold, tp_r):
     idx=np.flatnonzero(signal_mask)
     rows=[]
@@ -423,8 +437,17 @@ def run_h4_swing(symbol,b,outdir):
             tr=eval_trades_rr(b,mask,direction,av,48,tp_r)
             s=summarize(tr)
             forced=int((tr["reason"]=="TIME").sum()) if not tr.empty else 0
-            rr_rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,"tp_r":tp_r,"sl_r":1.0,"forced_48h":forced,**s})
-            print(f"RRGRID {name:24s} TP={tp_r:4.2f}R n={s['trades']:4d} win={s['win_pct']:6.2f}% PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f} forced={forced}",flush=True)
+            wins=int((tr["R"]>0).sum()) if not tr.empty else 0
+            p0,pval,ci_lo,ci_hi=binom_diagnostic(wins,len(tr),tp_r)
+            rr_rows.append({"symbol":symbol,"timeframe":tf_name,"filter":name,"tp_r":tp_r,"sl_r":1.0,"forced_48h":forced,"breakeven_win_p":p0,"binom_p_one_sided":pval,"win_ci95_lo":ci_lo,"win_ci95_hi":ci_hi,**s})
+            print(f"RRGRID {name:24s} TP={tp_r:4.2f}R n={s['trades']:4d} win={s['win_pct']:6.2f}% PF={s['pf']:7.3f} avgR={s['avg_r']:+.4f} DD={s['max_dd_r']:.1f} forced={forced} p0={100*p0:5.1f}% p={pval:.4f} CI95=[{100*ci_lo:4.1f},{100*ci_hi:4.1f}]",flush=True)
+            if not tr.empty:
+                years=pd.to_datetime(tr["signal_time"]).dt.year
+                eras=np.select([years<=2018,years<=2022],["2015-2018","2019-2022"],default="2023-2026")
+                et=tr.copy(); et["era"]=eras
+                for era,g in et.groupby("era"):
+                    es=summarize(g)
+                    print(f"RRERA {name:24s} TP={tp_r:4.2f}R {era}: n={es['trades']:3d} win={es['win_pct']:6.2f}% PF={es['pf']:7.3f} avgR={es['avg_r']:+.4f}",flush=True)
     pd.DataFrame(rr_rows).to_csv(outdir/f"{symbol}_{tf_name}_rr_grid.csv",index=False)
     return out
 
