@@ -19,6 +19,16 @@ jobs:
         run: python -m pip install -U yt-dlp
       - name: Fetch Japanese subtitles
         run: |
+          echo '=== DIRECT TIMEDTEXT ==='
+          for u in \
+            'https://www.youtube.com/api/timedtext?lang=ja&v=1uTo6hByhsY' \
+            'https://www.youtube.com/api/timedtext?lang=ja&kind=asr&v=1uTo6hByhsY' \
+            'https://www.youtube.com/api/timedtext?fmt=vtt&lang=ja&v=1uTo6hByhsY' \
+            'https://www.youtube.com/api/timedtext?fmt=vtt&lang=ja&kind=asr&v=1uTo6hByhsY'; do
+            echo URL=$u
+            curl -L --max-time 30 -A 'Mozilla/5.0' "$u" | head -c 4000 || true
+            echo
+          done
           mkdir -p /tmp/goscal
           yt-dlp --skip-download --write-auto-subs --write-subs --sub-langs 'ja.*,ja,en.*' --sub-format vtt -o '/tmp/goscal/%(id)s.%(ext)s' 'https://www.youtube.com/watch?v=1uTo6hByhsY' || true
           echo '=== FILES ==='
@@ -29,7 +39,7 @@ jobs:
           import re, html
           files=sorted(Path('/tmp/goscal').glob('*.vtt'))
           if not files:
-              raise SystemExit('NO_SUBTITLE_FILES')
+              print('NO_SUBTITLE_FILES'); raise SystemExit(0)
           p=next((x for x in files if '.ja' in x.name), files[0])
           print('USING', p.name)
           seen=[]
