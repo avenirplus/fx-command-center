@@ -8,6 +8,7 @@ on:
       - "research/backtest_trend_modes.py"
       - "research/backtest_fib_bands.py"
       - "research/backtest_sensitivity.py"
+      - "research/backtest_gold_shallow_sensitivity.py"
       - ".github/workflows/research-backtest.yml"
 
 permissions:
@@ -50,6 +51,11 @@ jobs:
       - name: Run formal F1 Fibonacci-band robustness
         run: |
           python research/backtest_fib_bands.py --symbol "${{ matrix.symbol }}"
+
+      - name: Run Gold shallow-pullback sensitivity
+        if: matrix.symbol == 'XAUUSD'
+        run: |
+          python research/backtest_gold_shallow_sensitivity.py --symbol XAUUSD
 
       - name: Upload research results
         if: always()
