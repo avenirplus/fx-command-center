@@ -6,6 +6,7 @@ on:
     paths:
       - "research/backtest_hidden_divergence.py"
       - "research/backtest_trend_modes.py"
+      - "research/backtest_fib_bands.py"
       - "research/backtest_sensitivity.py"
       - ".github/workflows/research-backtest.yml"
 
@@ -45,6 +46,10 @@ jobs:
       - name: Run T2 MACD sensitivity robustness test
         run: |
           python research/backtest_sensitivity.py --symbol "${{ matrix.symbol }}"
+
+      - name: Run formal F1 Fibonacci-band robustness
+        run: |
+          python research/backtest_fib_bands.py --symbol "${{ matrix.symbol }}"
 
       - name: Upload research results
         if: always()
