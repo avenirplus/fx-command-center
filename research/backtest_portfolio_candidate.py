@@ -67,6 +67,15 @@ def main():
         print("PORTANNUAL "+mode)
         for y,row in annual.iterrows():
             print(f"{int(y)} n={int(row['trades']):2d} R={row['R']:+.2f}")
+        for risk_pct in [0.5,1.0,2.0,3.0,5.0]:
+            f=risk_pct/100.0
+            eq=1.0; peak=1.0; maxdd=0.0
+            for rr in z["R"].to_numpy(float):
+                eq *= (1.0 + f*rr)
+                peak=max(peak,eq)
+                maxdd=max(maxdd,1.0-eq/peak)
+            cagr=eq**(1/11.75)-1 if eq>0 else -1.0
+            print(f"PORTRISK {mode} risk={risk_pct:.1f}% final_x={eq:.4f} total_return={(eq-1)*100:+.2f}% maxDD={maxdd*100:.2f}% CAGR={cagr*100:.2f}%")
         z.to_csv(out/f"portfolio_{mode}_trades.csv",index=False)
         annual.to_csv(out/f"portfolio_{mode}_annual.csv")
 
