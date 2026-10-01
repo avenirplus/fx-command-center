@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - "research/backtest_hidden_divergence.py"
+      - "research/backtest_trend_modes.py"
       - ".github/workflows/research-backtest.yml"
 
 permissions:
@@ -35,6 +36,10 @@ jobs:
       - name: Run reconstructed cross-market backtest
         run: |
           python research/backtest_hidden_divergence.py --symbol "${{ matrix.symbol }}"
+
+      - name: Run pre-registered F1 trend-mode comparison
+        run: |
+          python research/backtest_trend_modes.py --symbol "${{ matrix.symbol }}"
 
       - name: Upload research results
         if: always()
