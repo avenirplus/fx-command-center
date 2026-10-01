@@ -1,0 +1,48 @@
+name: Research GO_SCAL transcript
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/research-goscal-transcript.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  transcript:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install yt-dlp
+        run: python -m pip install -U yt-dlp
+      - name: Fetch Japanese subtitles
+        run: |
+          mkdir -p /tmp/goscal
+          yt-dlp --skip-download --write-auto-subs --write-subs --sub-langs 'ja.*,ja,en.*' --sub-format vtt -o '/tmp/goscal/%(id)s.%(ext)s' 'https://www.youtube.com/watch?v=1uTo6hByhsY' || true
+          echo '=== FILES ==='
+          find /tmp/goscal -maxdepth 1 -type f -printf '%f\n' | sort
+          echo '=== TRANSCRIPT CLEAN ==='
+          python - <<'PY'
+          from pathlib import Path
+          import re, html
+          files=sorted(Path('/tmp/goscal').glob('*.vtt'))
+          if not files:
+              raise SystemExit('NO_SUBTITLE_FILES')
+          p=next((x for x in files if '.ja' in x.name), files[0])
+          print('USING', p.name)
+          seen=[]
+          for line in p.read_text(encoding='utf-8',errors='ignore').splitlines():
+              s=line.strip()
+              if not s or '-->' in s or s.startswith(('WEBVTT','Kind:','Language:','NOTE')):
+                  continue
+              s=re.sub(r'<[^>]+>','',s)
+              s=html.unescape(s)
+              s=re.sub(r'\s+',' ',s).strip()
+              if not s or s.isdigit():
+                  continue
+              if not seen or s!=seen[-1]:
+                  seen.append(s)
+          print('\n'.join(seen))
+          PY
