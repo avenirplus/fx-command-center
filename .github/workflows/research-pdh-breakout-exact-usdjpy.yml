@@ -1,0 +1,32 @@
+name: Research PDH breakout exact USDJPY
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/backtest_pdh_breakout_exact.py"
+      - ".github/workflows/research-pdh-breakout-exact-usdjpy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  exact:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6" "dukascopy-python>=4.0" "tzdata>=2025.2"
+      - name: Run USDJPY exact PDH breakout
+        run: python research/backtest_pdh_breakout_exact.py --symbol USDJPY
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdh-breakout-exact-usdjpy
+          path: research/results/
+          retention-days: 14
