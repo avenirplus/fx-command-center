@@ -66,6 +66,12 @@ def main():
                 zdf["era"]=eras
                 for era,g in zdf.groupby("era",sort=False):
                     print(f"GSIXMERA {args.symbol} {name:27s} {era} n={len(g):6d} win={100*(g.r>0).mean():6.2f}% meanATR={g.r.mean():+.5f} medATR={g.r.median():+.5f}",flush=True)
+                hrs=b.index.hour
+                sess=np.select([hrs<6,hrs<12,hrs<18],["EET00-05","EET06-11","EET12-17"],default="EET18-23")
+                sdf=pd.DataFrame({"r":rr,"mask":mask,"session":sess})
+                sdf=sdf[sdf["mask"] & sdf["r"].notna()]
+                for sn,g in sdf.groupby("session",sort=False):
+                    print(f"GSIXMSES {args.symbol} {name:27s} {sn} n={len(g):6d} win={100*(g.r>0).mean():6.2f}% meanATR={g.r.mean():+.5f} medATR={g.r.median():+.5f}",flush=True)
     pd.DataFrame(rows).to_csv(f"research/results/{args.symbol}_GOSCAL_inspired_v01_crossmarket.csv",index=False)
 
 if __name__=="__main__":
