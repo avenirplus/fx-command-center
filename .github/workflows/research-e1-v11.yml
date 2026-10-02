@@ -1,0 +1,37 @@
+name: Research E1 v1.1 support resistance
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/E1_V11_PREREGISTERED_SPEC.md"
+      - "research/backtest_e1_v11_support_resistance.py"
+      - ".github/workflows/research-e1-v11.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  e1v11:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [USDJPY, XAUUSD]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6"
+      - name: Run E1 v1.1
+        run: python research/backtest_e1_v11_support_resistance.py --symbol "${{ matrix.symbol }}"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e1v11-${{ matrix.symbol }}
+          path: research/results/
+          retention-days: 14
