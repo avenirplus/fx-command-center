@@ -1,0 +1,37 @@
+name: Research PDH Momentum M5 v0.1
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "research/PDH_MOMENTUM_M5_V01_PREREGISTERED_SPEC.md"
+      - "research/backtest_pdh_momentum_m5_v01.py"
+      - ".github/workflows/research-pdh-m5-v01.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  m5:
+    strategy:
+      fail-fast: false
+      matrix:
+        symbol: [USDJPY, XAUUSD]
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install "pandas>=2.2,<3" "numpy>=2,<3" "gdown>=5,<6" "dukascopy-python>=4.0" "tzdata>=2025.2"
+      - name: Run exact M5 screen
+        run: python research/backtest_pdh_momentum_m5_v01.py --symbol "${{ matrix.symbol }}"
+      - name: Upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdh-m5-${{ matrix.symbol }}
+          path: research/results/
+          retention-days: 14
