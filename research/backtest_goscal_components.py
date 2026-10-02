@@ -39,6 +39,8 @@ def summarize_signal(name,mask,direction,b,atr):
         if len(z)==0: continue
         rows.append((h,len(z),float((z>0).mean()*100),float(z.mean()),float(z.median())))
         print(f"FWD {name:28s} h={h:2d} n={len(z):7d} win={100*(z>0).mean():6.2f}% meanATR={z.mean():+.5f} medATR={z.median():+.5f}")
+        q=z.quantile([0.001,0.01,0.05,0.95,0.99,0.999])
+        print(f"QTL {name:28s} h={h:2d} q001={q.loc[0.001]:+.3f} q01={q.loc[0.01]:+.3f} q05={q.loc[0.05]:+.3f} q95={q.loc[0.95]:+.3f} q99={q.loc[0.99]:+.3f} q999={q.loc[0.999]:+.3f} maxabs={z.abs().max():.3f}")
 
     # 20-min stability by era and 6-hour EET blocks.
     rr20=direction*(c.shift(-20)-o.shift(-1))/av
