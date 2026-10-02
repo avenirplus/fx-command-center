@@ -104,17 +104,20 @@ Therefore:
 
 Status: INCOMPLETE SPEC / HOLD.
 
-## Active development gate
+## PDH Momentum M5 v0.1
 
-### PDH Momentum M5 v0.1
-Motivated by M1 spread failure; separately preregistered.
-Goal: test whether increasing the signal/execution timeframe reduces spread/ATR enough for the underlying positive-skew breakout phenomenon to survive exact Bid/Ask execution.
+Exact Bid/Ask completed. All tested signal variants and 15/30/60/120-minute exits were negative on both USDJPY and XAUUSD.
 
-Markets:
-- USDJPY
-- XAUUSD
+- USDJPY EMA+cloud: 30m -0.0476 ATR; 60m -0.0457 ATR.
+- XAUUSD EMA+cloud: 30m -0.2648 ATR; 120m -0.2348 ATR.
 
-Status: RUNNING / DEVELOPMENT ONLY.
+**Status: REJECTED.**
+
+The entire current PDH/PDL momentum family is closed at M1 and M5. Do not tune session/threshold/exit windows on the same sample to rescue it.
+
+## Next independent lane
+
+Hosopi-3 source-fidelity audit and backtest preparation is active. The current public code and the older BB20/2σ configuration are treated as separate specifications.
 
 ## Research discipline
 
