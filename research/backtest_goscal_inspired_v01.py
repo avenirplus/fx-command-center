@@ -39,6 +39,12 @@ def evaluate(name,mask,direction,b,atr):
             zz["era"]=eras
             for era,g in zz.groupby("era",sort=False):
                 print(f"GSI ERA20 {name:27s} {era} n={len(g):6d} win={100*(g.r>0).mean():6.2f}% meanATR={g.r.mean():+.5f} medATR={g.r.median():+.5f}")
+            hrs=b.index.hour
+            sess=np.select([hrs<6,hrs<12,hrs<18],["EET00-05","EET06-11","EET12-17"],default="EET18-23")
+            ss=pd.DataFrame({"r":rr,"mask":mask,"session":sess})
+            ss=ss[ss["mask"] & ss["r"].notna()]
+            for sn,g in ss.groupby("session",sort=False):
+                print(f"GSI SES20 {name:27s} {sn} n={len(g):6d} win={100*(g.r>0).mean():6.2f}% meanATR={g.r.mean():+.5f} medATR={g.r.median():+.5f}")
     return rows
 
 def main():
