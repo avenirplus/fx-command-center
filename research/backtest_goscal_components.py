@@ -55,6 +55,7 @@ def summarize_signal(name,mask,direction,b,atr):
     return rows
 
 def main():
+    Path("research/results").mkdir(parents=True,exist_ok=True)
     work=Path("_research_work"); work.mkdir(exist_ok=True)
     z=work/"XAUUSD_bid.zip"
     if not z.exists(): z=download_zip("XAUUSD",work)
